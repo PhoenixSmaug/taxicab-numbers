@@ -1,4 +1,5 @@
 using DataStructures
+using Serialization
 
 """
 Compute General Taxicab Numbers
@@ -13,32 +14,40 @@ Compute General Taxicab Numbers
 (c) Mia Muessig
 """
 
-N = 10^3  # upper search limit, i.e. a, b <= N
-k = 3  # power of the equation (k = 3:  https://oeis.org/A001235, k = 4: https://oeis.org/A018786, k = 5, 6 conjectured impossible)
+N = 10^5  # upper search limit, i.e. a, b <= N
+k = 4  # power of the equation (k = 3:  https://oeis.org/A001235, k = 4: https://oeis.org/A018786, k = 5, 6 conjectured impossible)
 
-# min heap is used to loop through all combinations of a^k + b^k in ascending order, only O(N) values are stored at each time
-h = BinaryMinHeap{Tuple{UInt128, UInt128, UInt128}}()
+function taxicab(k::Int64, N::Int64, h::BinaryMinHeap{Tuple{UInt128, UInt128, UInt128}} = BinaryMinHeap{Tuple{UInt128, UInt128, UInt128}}(), old::Vector{UInt128} = Vector{UInt128}([0, 0, 0]), count::Int64 = 0)
+    if isempty(h)  # h is not already set, start from the beginning
+        # start with the diagonal entries (compare to Sec. 3 Refinements in https://www.ams.org/journals/mcom/2001-70-233/S0025-5718-00-01219-9/S0025-5718-00-01219-9.pdf)
+        for i in 1 : N
+            a = convert(UInt128, i)
+            push!(h, (2 * a^k, a, a))
+        end
+    end
 
-# start with the diagonal entries (compare to Sec. 3 Refinements in https://www.ams.org/journals/mcom/2001-70-233/S0025-5718-00-01219-9/S0025-5718-00-01219-9.pdf)
-for i in 1 : N
-    a = convert(UInt128, i)
-    push!(h, (2 * a^k, a, a))
+    steps = 0
+    while !isempty(h)  # loop trough all combinations of a and b (a >= b) in ascending order
+        (y, a, b) = pop!(h)  # remove minimal element
+
+        if y == old[1]  # a^k + b^k is the same as oldA^k + oldB^k and so (a, b, c = oldA, d = oldB) is a solution to the diophantine equation
+            count += 1
+            println(string(count) * " " * string(y) * " (" * string(a) * "^" * string(k) * " + " * string(b) * "^" * string(k) * " = " * string(old[2]) * "^" * string(k) * " + " * string(old[3]) * "^" * string(k) * ")")
+        end
+        
+        old[1] = y; old[2] = a; old[3] = b
+
+        if a < N  # if upper limit is not reached, put next element in heap
+            push!(h, ((a+1)^k + b^k, a+1, b))
+        end
+
+        steps += 1
+        if steps % 10^9 == 0
+            serialize("save.dat", (h, old, count))  # save to file
+        end
+    end
 end
 
-count = 0
-old = Vector{UInt128}([0, 0, 0])
-while !isempty(h)  # loop trough all combinations of a and b (a >= b) in ascending order
-    (y, a, b) = pop!(h)  # remove minimal element
-
-    if y == old[1]  # a^k + b^k is the same as oldA^k + oldB^k and so (a, b, c = oldA, d = oldB) is a solution to the diophantine equation
-        global count += 1
-        println(string(count) * " " * string(y) * " (" * string(a) * "^" * string(k) * " + " * string(b) * "^" * string(k) * " = " * string(old[2]) * "^" * string(k) * " + " * string(old[3]) * "^" * string(k) * ")")
-    end
-    
-    old[1] = y; old[2] = a; old[3] = b
-
-    if a < N  # if upper limit is not reached, put next element in heap
-        push!(h, ((a+1)^k + b^k, a+1, b))
-    end
-end
-
+taxicab(k, N)
+#h, old, count = deserialize("save.dat")
+#taxicab(k, N, h, old, count)
